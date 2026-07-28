@@ -29,6 +29,9 @@ Render 官方 Docker 部署会从仓库 Dockerfile 构建镜像，运行环境�
 - Service Worker 不缓存 `/api/`；
 - 发布包、镜像上下文和 Git 中没有 `.env`、题图、录音、截图或学习数据。
 
-## 当前尚未自动完成的外部步骤
+## 当前部署
 
-本地仓库目前没有 GitHub remote，系统也没有 GitHub CLI；Render 账号尚未连接。因此代码和 Blueprint 可验证，但实际公网 URL 必须在用户的 GitHub/Render 登录会话中完成一次仓库连接与秘密录入。
+- 私有仓库：`https://github.com/jcsdxhe/study-supervisor-product`
+- Render Free Web Service：`https://study-supervisor-product.onrender.com`
+- 2026-07-28 公网验收：主页与 `/api/health` 返回 200，健康接口返回 `{"ok":true,"mode":"cloud"}`，HSTS 与 CSP 生效，未登录访问 `/api/kimi/status` 返回 401。
+- 未执行真实 Kimi 请求，因此本次公网安全验收没有消耗模型余额。Free 实例闲置后会休眠，首次访问可能出现冷启动延迟。

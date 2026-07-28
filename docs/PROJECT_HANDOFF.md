@@ -23,7 +23,7 @@
 10. 随讲随画：第一次读图建立题目区域坐标；后续以结构化事件输出口语、题图荧光/圈选/箭头和板书；空间不足自动新建横向板书页。
 11. 课堂可靠性：模型不再控制板书坐标，本机按行高确定性排版并自动续页；麦克风默认屏蔽，打断与提问分离，识别文字默认确认后提交。
 12. 可安装 Web App：提供 PWA 清单、响应式手机布局和离线基础壳；AI API 明确不缓存，本机 Node 仍只监听 `127.0.0.1`。
-13. 安全云代理：已实现强制秘密门槛、口令登录、签名 Cookie、同源 POST、安全响应头、容器和 Render Blueprint；实际公网部署尚缺 GitHub remote 与 Render 账号连接。
+13. 安全云代理：已实现强制秘密门槛、口令登录、签名 Cookie、同源 POST、安全响应头、容器和 Render Blueprint；2026-07-28 已部署至 Render Free Web Service：`https://study-supervisor-product.onrender.com`。
 
 ## 真实验收记录
 

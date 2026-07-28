@@ -35,7 +35,7 @@
 ### v0.5：产品化与稳定发行（计划，P1）
 
 - [x] 经项目所有者授权的同源 HTTPS 云代理安全边界、认证 Cookie、容器与 Render Blueprint。
-- [ ] 建立私有 GitHub remote，连接 Render 账号、录入秘密并完成公网端到端验收。
+- [x] 建立私有 GitHub remote，连接 Render 账号、录入秘密并完成公网安全边界验收。
 
 ### v1.0：商业交付准备（计划，P2；涉及商业决策时需确认）
 
