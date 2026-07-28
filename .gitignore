@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 node_modules/
+.build/
 .npm-cache/
 .playwright-cli/
 output/

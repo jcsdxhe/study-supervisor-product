@@ -1,0 +1,22 @@
+{
+  "name": "向前 · 学习督导台",
+  "short_name": "向前",
+  "description": "隐私优先、本地优先的学习计划、每日汇报、题目白板与 AI 语音课堂。",
+  "lang": "zh-CN",
+  "start_url": "/#today",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f4f6f3",
+  "theme_color": "#10221d",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {"src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ],
+  "shortcuts": [
+    {"name": "今日执行", "url": "/#today"},
+    {"name": "每日汇报", "url": "/#daily-report"},
+    {"name": "题目批注板", "url": "/#whiteboard"}
+  ]
+}

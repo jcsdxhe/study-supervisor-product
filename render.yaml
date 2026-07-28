@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: forward-study-supervisor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: ALLOW_CLOUD_PROXY
+        value: "true"
+      - key: MOONSHOT_API_KEY
+        sync: false
+      - key: MOONSHOT_API_BASE
+        value: https://api.moonshot.cn/v1
+      - key: APP_ACCESS_TOKEN
+        sync: false
+      - key: SESSION_SIGNING_SECRET
+        generateValue: true
+      - key: AUTH_SESSION_HOURS
+        value: "12"
+      - key: KIMI_DEFAULT_MODEL
+        value: kimi-k2.6
+      - key: KIMI_SESSION_LIMIT
+        value: "5"
+      - key: KIMI_VOICE_TURN_LIMIT
+        value: "20"

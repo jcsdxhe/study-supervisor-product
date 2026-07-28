@@ -6,6 +6,12 @@ const crypto=require('crypto');
 const root=__dirname;
 loadEnv(path.join(root,'.env'));
 const port=Number(process.env.PORT||4174);
+const cloudMode=process.env.ALLOW_CLOUD_PROXY==='true';
+const listenHost=cloudMode?'0.0.0.0':'127.0.0.1';
+const accessToken=String(process.env.APP_ACCESS_TOKEN||'');
+const signingSecret=String(process.env.SESSION_SIGNING_SECRET||'');
+const publicOrigin=String(process.env.PUBLIC_ORIGIN||process.env.RENDER_EXTERNAL_URL||'').replace(/\/$/,'');
+const authTtlSeconds=clamp(process.env.AUTH_SESSION_HOURS,1,72,12)*60*60;
 const apiKey=process.env.MOONSHOT_API_KEY||'';
 const apiBase=(process.env.MOONSHOT_API_BASE||'https://api.moonshot.cn/v1').replace(/\/$/,'');
 const defaultModel=process.env.KIMI_DEFAULT_MODEL==='kimi-k3'?'kimi-k3':'kimi-k2.6';
@@ -14,8 +20,16 @@ const voiceTurnLimit=clamp(process.env.KIMI_VOICE_TURN_LIMIT,3,50,20);
 const sessionUsage=new Map();
 const tickets=new Map();
 const voiceClasses=new Map();
+const authFailures=new Map();
 const ticketTtlMs=10*60*1000;
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
+
+if(cloudMode){
+  if(accessToken.length<24)throw new Error('云代理拒绝启动：APP_ACCESS_TOKEN 至少需要 24 个字符。');
+  if(signingSecret.length<32)throw new Error('云代理拒绝启动：SESSION_SIGNING_SECRET 至少需要 32 个字符。');
+  if(!apiKey)throw new Error('云代理拒绝启动：MOONSHOT_API_KEY 未配置。');
+  if(!/^https:\/\/[^/]+$/i.test(publicOrigin))throw new Error('云代理拒绝启动：PUBLIC_ORIGIN/RENDER_EXTERNAL_URL 必须是 HTTPS 源站地址。');
+}
 
 function loadEnv(file){
   if(!fs.existsSync(file))return;
@@ -28,9 +42,22 @@ function loadEnv(file){
   }
 }
 function clamp(v,min,max,fallback){v=Number(v);return Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback}
+function safeEqual(a,b){const ah=crypto.createHash('sha256').update(String(a)).digest(),bh=crypto.createHash('sha256').update(String(b)).digest();return crypto.timingSafeEqual(ah,bh)}
+function parseCookies(req){const out={};for(const part of String(req.headers.cookie||'').split(';')){const at=part.indexOf('=');if(at<1)continue;try{out[part.slice(0,at).trim()]=decodeURIComponent(part.slice(at+1).trim())}catch{}}return out}
+function signSession(payload){return crypto.createHmac('sha256',signingSecret).update(payload).digest('base64url')}
+function createAuthCookie(){const issued=Math.floor(Date.now()/1000),nonce=crypto.randomBytes(18).toString('base64url'),payload=`v1.${issued}.${nonce}`,value=`${payload}.${signSession(payload)}`;return{value,session:`cloud-${nonce}`}}
+function verifyAuth(req){if(!cloudMode)return{session:null};const value=parseCookies(req).forward_cloud_session||'',parts=value.split('.');if(parts.length!==4||parts[0]!=='v1')return null;const issued=Number(parts[1]),payload=parts.slice(0,3).join('.'),sig=parts[3];if(!Number.isInteger(issued)||issued>Date.now()/1000+60||Date.now()/1000-issued>authTtlSeconds||!safeEqual(sig,signSession(payload)))return null;return{session:`cloud-${parts[2]}`}}
+function authCookieHeader(value,maxAge=authTtlSeconds){return`forward_cloud_session=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`}
+function requestIp(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'unknown').split(',')[0].trim().slice(0,80)}
+function loginAllowed(req){const key=requestIp(req),now=Date.now(),windowMs=15*60*1000,item=authFailures.get(key);if(!item||now-item.since>windowMs){authFailures.set(key,{since:now,count:1});return true}item.count++;return item.count<=10}
+function clearLoginFailures(req){authFailures.delete(requestIp(req))}
+function sameOrigin(req){if(!cloudMode)return true;return String(req.headers.origin||'')===publicOrigin}
+function securityHeaders(res){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(self), microphone=(self), display-capture=(self)');res.setHeader('Content-Security-Policy',"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:");if(cloudMode)res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains')}
+function cleanPlotEvent(raw){if(!raw||raw.type!=='function_plot')return null;const pair=(v,a,b)=>v==null?[a,b]:Array.isArray(v)&&v.length===2&&v.every(Number.isFinite)&&v[0]<v[1]&&v[1]-v[0]<=10000?v.map(Number):null,allowed=/^[\d\s.xpie+\-*/^()a-z]+$/i;let expressions=(Array.isArray(raw.expressions)?raw.expressions:[]).slice(0,4).map((e,i)=>({source:String(e?.source||'').slice(0,160),color:/^#[\da-f]{6}$/i.test(e?.color||'')?e.color:['#2979ff','#e85d4a','#18a06a','#8a55d7'][i]})).filter(e=>e.source&&allowed.test(e.source));if(!expressions.length)return null;let domain=pair(raw.domain,-5,5),range=pair(raw.range,-5,5),fill=null;if(!domain||!range)return null;if(raw.fill){if(!Number.isFinite(raw.fill.from)||!Number.isFinite(raw.fill.to)||raw.fill.from<domain[0]||raw.fill.to>domain[1]||raw.fill.from>=raw.fill.to)return null;let between=Array.isArray(raw.fill.between)?raw.fill.between.slice(0,2):[0,1];if(between.length!==2||!between.every(i=>Number.isInteger(i)&&i>=0&&i<expressions.length))return null;fill={from:raw.fill.from,to:raw.fill.to,between}}return{type:'function_plot',title:String(raw.title||'函数图像').slice(0,60),expressions,domain,range,fill}}
+function cleanMotionEvent(raw){if(!raw||raw.type!=='kinematics')return null;let duration=Number(raw.duration),x0=Number(raw.x0||0),v0=Number(raw.v0||0),a=Number(raw.a||0);if(![duration,x0,v0,a].every(Number.isFinite)||duration<=0||duration>60||Math.max(Math.abs(x0),Math.abs(v0),Math.abs(a))>10000)return null;return{type:'kinematics',title:String(raw.title||'匀加速直线运动').slice(0,60),duration,x0,v0,a}}
 function sendJSON(res,status,data){const body=JSON.stringify(data);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Content-Length':Buffer.byteLength(body)});res.end(body)}
-function sessionId(req){const raw=String(req.headers['x-study-session']||'');return /^[a-zA-Z0-9_-]{12,80}$/.test(raw)?raw:'anonymous'}
-function statusFor(req){const id=sessionId(req),used=sessionUsage.get(id)||0;return{configured:Boolean(apiKey),defaultModel,availableModels:['kimi-k2.6','kimi-k3'],sessionLimit,voiceTurnLimit,used,remaining:Math.max(0,sessionLimit-used),privacy:'题目图像仅在用户点击请求后经本机代理发送给 Kimi API；密钥不会发送到浏览器。'}}
+function sessionId(req){const auth=verifyAuth(req);if(cloudMode)return auth?.session||'unauthorized';const raw=String(req.headers['x-study-session']||'');return /^[a-zA-Z0-9_-]{12,80}$/.test(raw)?raw:'anonymous'}
+function statusFor(req){const id=sessionId(req),used=sessionUsage.get(id)||0;return{configured:Boolean(apiKey),cloudMode,defaultModel,availableModels:['kimi-k2.6','kimi-k3'],sessionLimit,voiceTurnLimit,used,remaining:Math.max(0,sessionLimit-used),privacy:cloudMode?'题图仅在用户主动请求后发送到受口令保护的同源云代理；不持久化题图、录音或学习数据，Kimi 密钥不会发送到浏览器。':'题目图像仅在用户点击请求后经本机代理发送给 Kimi API；密钥不会发送到浏览器。'}}
 function readJSON(req,max=16*1024*1024){return new Promise((resolve,reject)=>{let size=0,chunks=[];req.on('data',c=>{size+=c.length;if(size>max){reject(Object.assign(new Error('请求体过大'),{code:413}));req.destroy()}else chunks.push(c)});req.on('end',()=>{try{resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))}catch{reject(Object.assign(new Error('JSON 格式错误'),{code:400}))}});req.on('error',reject)})}
 function validateInput(body){
   if(!body||typeof body!=='object')throw Object.assign(new Error('请求内容无效'),{code:400});
@@ -88,14 +115,14 @@ async function voiceTurn(req,res){
     if(!text)return sendJSON(res,400,{error:'没有识别到可发送的问题。',code:'EMPTY_TRANSCRIPT'});
     if(item.turns>=voiceTurnLimit)return sendJSON(res,429,{error:`本节语音课堂已达到 ${voiceTurnLimit} 轮上限。`,code:'VOICE_TURN_LIMIT'});
     item.turns++;item.expires=Date.now()+45*60*1000;
-    const system='你是一位在实时网课中与学生一对一交流、会边讲边指和写板书的中文老师。根据备课材料准确回答。学生要求完整讲解时必须完整分步讲，不要只给提示。你的输出必须是 JSONL：每行一个完整 JSON，不能有代码围栏或其他文字。可用事件：1）{"type":"say","text":"适合自然朗读的一至两句话"}；2）{"type":"mark","anchor":"备课材料中的区域id","style":"highlight或circle或rect或arrow","color":"#十六进制颜色"}，用于在讲到该区域前指示；3）{"type":"board","title":"板书标题","newPage":false,"items":[{"text":"公式或推导","x":80,"y":130,"color":"#颜色"}]}，坐标0-1000，单页最多8项，空间不够时 newPage=true。按真实上课顺序交替输出 mark、board、say。say 事件禁止 Markdown、LaTeX、星号、JSON术语；公式改写成适合中文语音朗读的表达。语气自然，有合理停顿，不重复题干，不说自己是模型。';
+    const system='你是一位在实时网课中与学生一对一交流、会边讲边指和写板书的中文老师。根据备课材料准确回答。学生要求完整讲解时必须完整分步讲，不要只给提示。你的输出必须是 JSONL：每行一个完整 JSON，不能有代码围栏或其他文字。为了尽快开口，第一行必须先输出一句简短 say，再继续讲解。可用事件：1）{"type":"say","text":"适合自然朗读的一至两句话"}；2）{"type":"mark","anchor":"备课材料中的区域id","style":"highlight或circle或rect或arrow","color":"#十六进制颜色"}；3）{"type":"board","title":"板书标题","newPage":false,"items":[{"text":"一条完整公式或一步推导","color":"#颜色"}]}；4）积分或函数题可用 {"type":"plot","spec":{"type":"function_plot","title":"标题","expressions":[{"source":"x^2","color":"#2979ff"}],"domain":[-2,2],"range":[-1,4],"fill":{"from":0,"to":2,"between":[0,1]}}}；5）匀加速直线运动可用 {"type":"motion","spec":{"type":"kinematics","title":"标题","duration":5,"x0":0,"v0":2,"a":1}}。板书 items 必须按讲解顺序给出，每项只写一个公式或一步推导，不得自行安排坐标、重复前文或把多步挤在同一项；版面由客户端自动排版，空间不足会自动续页。表达式只用 x、数字、pi、e、sin/cos/tan/abs/sqrt/exp/ln/log 和基本运算，不得输出代码。按真实上课顺序交替输出事件。say 禁止 Markdown、LaTeX、星号、JSON术语；公式改写成适合中文语音朗读的表达。';
     const recent=item.history.slice(-6),messages=[{role:'system',content:system},{role:'user',content:`本节课备课材料：${JSON.stringify(item.lesson)}`}];for(const h of recent)messages.push(h);messages.push({role:'user',content:text});
     const upstream=await fetch(`${apiBase}/chat/completions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model:item.model,messages,stream:true,stream_options:{include_usage:true},max_tokens:1000,...(item.model==='kimi-k2.6'?{thinking:{type:'disabled'}}:{reasoning_effort:'low'})})});
     if(!upstream.ok)return apiError(res,upstream.status,Math.max(0,voiceTurnLimit-item.turns),await upstream.text());
     res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'});const emit=(event,data)=>res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     const reader=upstream.body.getReader(),decoder=new TextDecoder();let buffer='',modelBuffer='',answer='',usage=null,returnedModel=item.model,first=true;
     const anchorMap=new Map((item.lesson.anchors||[]).map(a=>[a.id,a]));
-    const processLine=line=>{line=String(line||'').trim().replace(/^```(?:jsonl?|ndjson)?/i,'').replace(/```$/,'').trim();if(!line)return;let event;try{event=JSON.parse(line)}catch{return}if(event.type==='say'&&event.text){const spoken=String(event.text).slice(0,1400);answer+=(answer?'\n':'')+spoken;emit('delta',{text:spoken,first});first=false}else if(event.type==='mark'){const a=anchorMap.get(String(event.anchor||''));if(!a)return;const style=['highlight','circle','rect','arrow'].includes(event.style)?event.style:'highlight',color=/^#[0-9a-fA-F]{6}$/.test(event.color||'')?event.color:'#ef6b5b';let mark={type:style,color,x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,width:7};if(style==='arrow'){mark.x1=Math.max(0,a.x1-120);mark.y1=(a.y1+a.y2)/2;mark.x2=a.x1;mark.y2=(a.y1+a.y2)/2}emit('annotation',{target:'source',label:a.label,items:[mark]})}else if(event.type==='board'&&Array.isArray(event.items)){const items=event.items.slice(0,8).map(x=>({type:'text',text:String(x.text||'').slice(0,180),x1:clamp(x.x,0,1000,80),y1:clamp(x.y,0,1000,120),x2:0,y2:0,color:/^#[0-9a-fA-F]{6}$/.test(x.color||'')?x.color:'#245d4d',width:7})).filter(x=>x.text);if(items.length)emit('board',{title:String(event.title||'老师板书').slice(0,60),newPage:event.newPage===true,items})}};
+    const processLine=line=>{line=String(line||'').trim().replace(/^```(?:jsonl?|ndjson)?/i,'').replace(/```$/,'').trim();if(!line)return;let event;try{event=JSON.parse(line)}catch{return}if(event.type==='say'&&event.text){const spoken=String(event.text).slice(0,1400);answer+=(answer?'\n':'')+spoken;emit('delta',{text:spoken,first});first=false}else if(event.type==='mark'){const a=anchorMap.get(String(event.anchor||''));if(!a)return;const style=['highlight','circle','rect','arrow'].includes(event.style)?event.style:'highlight',color=/^#[0-9a-fA-F]{6}$/.test(event.color||'')?event.color:'#ef6b5b';let mark={type:style,color,x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,width:7};if(style==='arrow'){mark.x1=Math.max(0,a.x1-120);mark.y1=(a.y1+a.y2)/2;mark.x2=a.x1;mark.y2=(a.y1+a.y2)/2}emit('annotation',{target:'source',label:a.label,items:[mark]})}else if(event.type==='board'&&Array.isArray(event.items)){const items=event.items.slice(0,8).map(x=>({type:'text',text:String(x.text||'').slice(0,180),color:/^#[0-9a-fA-F]{6}$/.test(x.color||'')?x.color:'#245d4d',width:7})).filter(x=>x.text);if(items.length)emit('board',{title:String(event.title||'老师板书').slice(0,60),newPage:event.newPage===true,items})}else if(event.type==='plot'){const spec=cleanPlotEvent(event.spec);if(spec)emit('visual',{kind:'plot',spec})}else if(event.type==='motion'){const spec=cleanMotionEvent(event.spec);if(spec)emit('visual',{kind:'motion',spec})}};
     const processModel=text=>{modelBuffer+=text;const lines=modelBuffer.split(/\r?\n/);modelBuffer=lines.pop()||'';for(const line of lines)processLine(line)};
     while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split(/\r?\n/);buffer=lines.pop()||'';for(const line of lines){if(!line.startsWith('data:'))continue;const raw=line.slice(5).trim();if(!raw||raw==='[DONE]')continue;let chunk;try{chunk=JSON.parse(raw)}catch{continue}returnedModel=chunk.model||returnedModel;if(chunk.usage)usage=chunk.usage;const delta=chunk?.choices?.[0]?.delta?.content||'';if(delta)processModel(delta)}}if(modelBuffer.trim())processLine(modelBuffer);
     item.history.push({role:'user',content:text},{role:'assistant',content:answer});if(item.history.length>12)item.history=item.history.slice(-12);
@@ -147,7 +174,22 @@ async function explain(req,res){
 }
 
 const server=http.createServer(async(req,res)=>{
+  securityHeaders(res);
   const pathname=decodeURIComponent(req.url.split('?')[0]);
+  if(req.method==='GET'&&pathname==='/api/health')return sendJSON(res,200,{ok:true,mode:cloudMode?'cloud':'local'});
+  if(req.method==='GET'&&pathname==='/api/auth/status')return sendJSON(res,200,{cloudMode,authenticated:!cloudMode||Boolean(verifyAuth(req))});
+  if(req.method==='POST'&&pathname==='/api/auth/login'){
+    if(!cloudMode)return sendJSON(res,404,{error:'本机模式不需要云代理解锁。',code:'LOCAL_MODE'});
+    if(!sameOrigin(req))return sendJSON(res,403,{error:'请求来源无效。',code:'ORIGIN_REJECTED'});
+    if(!loginAllowed(req))return sendJSON(res,429,{error:'尝试次数过多，请 15 分钟后重试。',code:'AUTH_RATE_LIMIT'});
+    try{const body=await readJSON(req,8*1024),token=String(body?.token||'');if(!safeEqual(token,accessToken))return sendJSON(res,401,{error:'访问口令不正确。',code:'AUTH_INVALID'});clearLoginFailures(req);const auth=createAuthCookie();res.setHeader('Set-Cookie',authCookieHeader(auth.value));return sendJSON(res,200,{authenticated:true,expiresIn:authTtlSeconds})}catch{return sendJSON(res,400,{error:'解锁请求无效。',code:'AUTH_BAD_REQUEST'})}
+  }
+  if(req.method==='POST'&&pathname==='/api/auth/logout'){
+    if(cloudMode&&!sameOrigin(req))return sendJSON(res,403,{error:'请求来源无效。',code:'ORIGIN_REJECTED'});
+    res.setHeader('Set-Cookie',authCookieHeader('',0));return sendJSON(res,200,{authenticated:false});
+  }
+  if(cloudMode&&pathname.startsWith('/api/')&&!verifyAuth(req))return sendJSON(res,401,{error:'云代理已锁定，请先输入访问口令。',code:'AUTH_REQUIRED'});
+  if(cloudMode&&req.method==='POST'&&pathname.startsWith('/api/')&&!sameOrigin(req))return sendJSON(res,403,{error:'请求来源无效。',code:'ORIGIN_REJECTED'});
   if(req.method==='GET'&&pathname==='/api/kimi/status')return sendJSON(res,200,statusFor(req));
   if(req.method==='POST'&&pathname==='/api/kimi/assess')return assess(req,res);
   if(req.method==='POST'&&pathname==='/api/kimi/explain')return explain(req,res);
@@ -159,4 +201,4 @@ const server=http.createServer(async(req,res)=>{
   if(u.startsWith('/vendor/pdfjs/')){const asset=path.basename(u);if(!['pdf.min.mjs','pdf.worker.min.mjs'].includes(asset)){res.writeHead(404);return res.end('Not found')}file=path.join(root,'node_modules','pdfjs-dist','build',asset)}else{file=path.normalize(path.join(root,u));if(!file.startsWith(root)){res.writeHead(403);return res.end('Forbidden')}}
   fs.readFile(file,(e,d)=>{if(e){res.writeHead(404);return res.end('Not found')}res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(d)});
 });
-server.listen(port,'127.0.0.1',()=>console.log(`学习督导台已启动：http://127.0.0.1:${port} · Kimi ${apiKey?'已配置':'未配置'}`));
+server.listen(port,listenHost,()=>console.log(`学习督导台已启动：${cloudMode?publicOrigin:`http://127.0.0.1:${port}`} · ${cloudMode?'安全云代理':'本机代理'} · Kimi ${apiKey?'已配置':'未配置'}`));

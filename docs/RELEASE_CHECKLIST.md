@@ -7,6 +7,7 @@
 - [ ] `npm.cmd ci` 与 `npm.cmd run check` 通过。
 - [ ] Edge/Chrome 完成计划、批注、PDF、语音、摄像头权限的视觉冒烟测试。
 - [ ] keyless 状态可启动；所有 AI 操作明确禁用或返回可理解错误。
+- [ ] 若发布云版：缺少任一云秘密时拒绝启动；未登录 AI API 为 401；恶意 Origin 为 403；Cookie 包含 HttpOnly/Secure/SameSite；镜像上下文不含 `.env` 或用户数据。
 
 ## 隐私与安全
 

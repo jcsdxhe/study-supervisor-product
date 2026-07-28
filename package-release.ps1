@@ -12,16 +12,20 @@ if (Test-Path -LiteralPath $dist) { Remove-Item -Recurse -Force -LiteralPath $di
 if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
 New-Item -ItemType Directory -Path $dist | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $dist 'tests') | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $dist 'docs') | Out-Null
 
 $files = @(
-  'index.html','styles.css','app.js','supervision.js','supervision.css',
-  'whiteboard.js','whiteboard.css','kimi.js','voice-class.js','server.js','favicon.ico',
+  'index.html','styles.css','app.js','daily-report.ts','daily-report.js','daily-report.css','tsconfig.json','supervision.js','supervision.css',
+  'whiteboard.js','whiteboard.css','kimi.js','voice-class.js','teaching-visuals.js','pwa.js','sw.js','manifest.webmanifest','app-icon.svg','server.js','favicon.ico',
+  'Dockerfile','.dockerignore','render.yaml',
   'package.json','package-lock.json','.env.example','.gitignore','README.md','INSTALL.md',
   'PRIVACY.md','TERMS_TEMPLATE.md','LICENSE','NOTICE','VERSION','CHANGELOG.md',
   'package-release.ps1','启动学习督导台.bat'
 )
 foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $source $name) -Destination (Join-Path $dist $name) }
 Copy-Item -LiteralPath (Join-Path $source 'tests\check.js') -Destination (Join-Path $dist 'tests\check.js')
+Copy-Item -LiteralPath (Join-Path $source 'tests\cloud-proxy-check.js') -Destination (Join-Path $dist 'tests\cloud-proxy-check.js')
+Copy-Item -LiteralPath (Join-Path $source 'docs\CLOUD_DEPLOYMENT.md') -Destination (Join-Path $dist 'docs\CLOUD_DEPLOYMENT.md')
 
 # PDF.js is a local runtime asset. Include the minimal browser build so buyers retain
 # PDF-to-annotation capability without a separate install.
