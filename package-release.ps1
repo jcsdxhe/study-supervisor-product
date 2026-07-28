@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Path (Join-Path $dist 'docs') | Out-Null
 
 $files = @(
   'index.html','styles.css','app.js','daily-report.ts','daily-report.js','daily-report.css','tsconfig.json','supervision.js','supervision.css',
-  'whiteboard.js','whiteboard.css','kimi.js','voice-class.js','teaching-visuals.js','pwa.js','sw.js','manifest.webmanifest','app-icon.svg','server.js','favicon.ico',
+  'whiteboard.js','whiteboard.css','kimi.js','voice-class.js','teaching-visuals.js','classroom-archive.js','classroom-archive.css','review-protocol.js','pwa.js','sw.js','manifest.webmanifest','app-icon.svg','server.js','favicon.ico',
   'Dockerfile','.dockerignore','render.yaml',
   'package.json','package-lock.json','.env.example','.gitignore','README.md','INSTALL.md',
   'PRIVACY.md','TERMS_TEMPLATE.md','LICENSE','NOTICE','VERSION','CHANGELOG.md',

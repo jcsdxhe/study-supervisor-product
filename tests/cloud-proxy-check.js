@@ -27,6 +27,8 @@ async function waitFor(url,child){for(let i=0;i<50;i++){if(child.exitCode!==null
     r=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json','Origin':origin},body:JSON.stringify({token})});assert.strictEqual(r.status,200);const cookie=r.headers.get('set-cookie');assert(cookie);for(const flag of ['HttpOnly','Secure','SameSite=Strict'])assert(cookie.includes(flag),`missing cookie flag ${flag}`);const sessionCookie=cookie.split(';')[0];
     r=await fetch(`${base}/api/kimi/status`,{headers:{Cookie:sessionCookie}});assert.strictEqual(r.status,200);const status=await r.json();assert.strictEqual(status.cloudMode,true);assert.strictEqual(status.configured,true);
     r=await fetch(`${base}/api/kimi/voice/end`,{method:'POST',headers:{'Content-Type':'application/json','Origin':'https://evil.example',Cookie:sessionCookie},body:'{}'});assert.strictEqual(r.status,403);
+    r=await fetch(`${base}/api/kimi/voice/review`,{method:'POST',headers:{'Content-Type':'application/json','Origin':'https://evil.example',Cookie:sessionCookie},body:JSON.stringify({transcript:[],options:{summary:true}})});assert.strictEqual(r.status,403);
+    r=await fetch(`${base}/api/kimi/voice/review`,{method:'POST',headers:{'Content-Type':'application/json','Origin':origin},body:JSON.stringify({transcript:[],options:{summary:true}})});assert.strictEqual(r.status,401);
     r=await fetch(`${base}/api/auth/logout`,{method:'POST',headers:{'Origin':origin,Cookie:sessionCookie}});assert.strictEqual(r.status,200);assert(r.headers.get('set-cookie').includes('Max-Age=0'));
   }finally{child.kill();}
   console.log('✓ 安全云代理启动门槛、认证 Cookie、来源校验与未授权拒绝检查通过');

@@ -2,6 +2,7 @@ const http=require('http');
 const fs=require('fs');
 const path=require('path');
 const crypto=require('crypto');
+const {cleanClassReview}=require('./review-protocol');
 
 const root=__dirname;
 loadEnv(path.join(root,'.env'));
@@ -110,7 +111,7 @@ async function startVoiceClass(req,res){
     lesson.anchors=(Array.isArray(lesson.anchors)?lesson.anchors:[]).slice(0,12).map((a,i)=>({id:String(a.id||`area_${i+1}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,40),label:String(a.label||'题目区域').slice(0,80),x1:clamp(a.x1,0,1000,0),y1:clamp(a.y1,0,1000,0),x2:clamp(a.x2,0,1000,1000),y2:clamp(a.y2,0,1000,1000)}));
     purgeVoiceClasses();const classId=crypto.randomBytes(24).toString('base64url');voiceClasses.set(classId,{owner:sessionId(req),model:input.model,lesson,history:[],turns:0,expires:Date.now()+45*60*1000});
     const greeting=lesson.clarity==='unclear'?'这张题目有部分内容看不清。你可以告诉我缺失条件，或者换一张更清晰的图片。':'题目我已经看清并备好课了。你可以直接问我哪里不会，也可以说“从头完整讲一遍”。';
-    return sendJSON(res,200,{classId,greeting,clarity:lesson.clarity||'unclear',confidence:lesson.confidence||'low',voiceTurnLimit,model:data.model||input.model});
+    return sendJSON(res,200,{classId,greeting,problem:String(lesson.problem||'').slice(0,6000),clarity:lesson.clarity||'unclear',confidence:lesson.confidence||'low',voiceTurnLimit,model:data.model||input.model});
   }catch(e){return sendJSON(res,e.code||500,{error:e.code?e.message:'语音课堂准备失败。',code:'VOICE_PREP_ERROR'})}
 }
 
@@ -141,6 +142,26 @@ async function voiceTurn(req,res){
   }catch(e){if(res.headersSent){res.write(`event: error\ndata: ${JSON.stringify({error:'语音回答中断，请再说一遍。'})}\n\n`);return res.end()}return sendJSON(res,e.code||500,{error:e.code?e.message:'语音课堂请求失败。',code:'VOICE_TURN_ERROR'})}
 }
 async function endVoiceClass(req,res){try{const body=await readJSON(req,16*1024),id=String(body?.classId||''),item=voiceClasses.get(id);if(item&&item.owner===sessionId(req))voiceClasses.delete(id);return sendJSON(res,200,{ended:true})}catch{return sendJSON(res,200,{ended:true})}}
+
+async function reviewVoiceClass(req,res){
+  if(!apiKey)return sendJSON(res,503,{error:'Kimi 尚未配置，课堂文字记录仍已保存在本机。',code:'KIMI_NOT_CONFIGURED'});
+  const id=sessionId(req),used=sessionUsage.get(id)||0;
+  if(used>=sessionLimit)return sendJSON(res,429,{error:`本次浏览器会话已达到 ${sessionLimit} 次 AI 请求上限，课堂档案不受影响。`,code:'SESSION_LIMIT'});
+  try{
+    const body=await readJSON(req,128*1024);if(!body||typeof body!=='object')throw Object.assign(new Error('复盘请求无效'),{code:400});
+    const problem=String(body.problem||'').trim().slice(0,6000),model=body.model==='kimi-k3'?'kimi-k3':'kimi-k2.6',rawOptions=body.options&&typeof body.options==='object'?body.options:{},options={summary:rawOptions.summary===true,homework:rawOptions.homework===true||rawOptions.answers===true,answers:rawOptions.answers===true};
+    if(!options.summary&&!options.homework&&!options.answers)throw Object.assign(new Error('请至少选择一项复盘内容'),{code:400});
+    if(!Array.isArray(body.transcript)||body.transcript.length>160)throw Object.assign(new Error('课堂文字记录格式无效'),{code:400});
+    let total=0;const transcript=body.transcript.map(item=>{const role=item?.role==='student'?'student':item?.role==='teacher'?'teacher':'';const text=String(item?.text||'').trim().slice(0,5000);total+=text.length;if(!role||!text)throw Object.assign(new Error('课堂文字记录格式无效'),{code:400});return{role,text}});if(total>50000)throw Object.assign(new Error('课堂文字记录过长，请拆分复盘'),{code:400});
+    sessionUsage.set(id,used+1);
+    const system=`你是一位严谨、负责的中文老师，正在进行课后复盘。只依据题目和课堂文字记录判断，不能虚构学生表现。必须只输出一个 JSON 对象。用户选择：summary=${options.summary}，homework=${options.homework}，answers=${options.answers}。字段固定为 summary、homework、answers。summary 在未选择时为 null；选择时包含 overview、studentQuestions、weaknesses、nextProblemTypes、nextActions，其中后四项均为简短字符串数组。homework 未选择时为空数组；选择时给 3—5 道针对性新题，每项含 id、type、difficulty、question、objective，difficulty 只能是基础、进阶、挑战。answers 未选择时为空数组；选择时与作业 id 对应，每项含 homeworkId、answer、explanation。不要照抄原题，不要声称看到了文字记录之外的行为；证据不足的薄弱点应表述为“建议检查”。公式用清晰的普通文本或 Unicode。`;
+    const user=`原题：${problem||'未保留题目转写'}\n课堂文字记录：\n${transcript.map(item=>`${item.role==='student'?'学生':'老师'}：${item.text}`).join('\n')}`;
+    const upstream=await fetch(`${apiBase}/chat/completions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],response_format:{type:'json_object'},stream:false,max_tokens:options.answers?3200:2200,...(model==='kimi-k2.6'?{thinking:{type:'disabled'}}:{reasoning_effort:'low'})}),signal:AbortSignal.timeout(90000)});
+    if(!upstream.ok)return apiError(res,upstream.status,Math.max(0,sessionLimit-used-1),await upstream.text());
+    const data=await upstream.json(),message=data?.choices?.[0]?.message||{},raw=extractJson(message.content||message.reasoning_content),review=cleanClassReview(raw,options),usage=data.usage?{promptTokens:data.usage.prompt_tokens,completionTokens:data.usage.completion_tokens,totalTokens:data.usage.total_tokens}:null;
+    return sendJSON(res,200,{review,model:data.model||model,usage,remaining:Math.max(0,sessionLimit-used-1)});
+  }catch(e){if(e.name==='TimeoutError')return sendJSON(res,504,{error:'Kimi 复盘等待超时，请稍后重试。',code:'REVIEW_TIMEOUT'});return sendJSON(res,e.code||500,{error:e.code?e.message:'课堂复盘生成失败。',code:'REVIEW_ERROR'})}
+}
 
 async function assess(req,res){
   if(!apiKey)return sendJSON(res,503,{error:'Kimi 尚未配置。请在本机 .env 中设置 MOONSHOT_API_KEY 后重启应用。',code:'KIMI_NOT_CONFIGURED'});
@@ -207,6 +228,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&pathname==='/api/kimi/voice/start')return startVoiceClass(req,res);
   if(req.method==='POST'&&pathname==='/api/kimi/voice/turn')return voiceTurn(req,res);
   if(req.method==='POST'&&pathname==='/api/kimi/voice/end')return endVoiceClass(req,res);
+  if(req.method==='POST'&&pathname==='/api/kimi/voice/review')return reviewVoiceClass(req,res);
   if(pathname.startsWith('/api/'))return sendJSON(res,404,{error:'接口不存在'});
   let u=pathname==='/'?'/index.html':pathname,file;
   if(u.startsWith('/vendor/pdfjs/')){const asset=path.basename(u);if(!['pdf.min.mjs','pdf.worker.min.mjs'].includes(asset)){res.writeHead(404);return res.end('Not found')}file=path.join(root,'node_modules','pdfjs-dist','build',asset)}else{file=path.normalize(path.join(root,u));if(!file.startsWith(root)){res.writeHead(403);return res.end('Forbidden')}}
