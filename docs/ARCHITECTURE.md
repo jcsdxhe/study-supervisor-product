@@ -31,6 +31,7 @@ Edge / Chrome
 | `kimi.js` | 文字辅导、能力边界、自检、建议批注、语音转写入口 |
 | `voice-class.js` | 全屏语音课堂、连续问答、TTS 队列、随讲事件应用 |
 | `classroom-archive.js`, `classroom-archive.css` | 课堂档案、文字对话、可选 AI 复盘、本地录屏与回放管理 |
+| `learning-library.js`, `learning-library.css` | 个人资料库、PDF 页数/大小边界、资料送入本地批注板 |
 | `review-protocol.js` | 服务端复盘结果的结构、长度、数量和作业答案关联校验 |
 | `server.js` | 静态服务、环境变量、Kimi 代理、限额、SSE 和输出验证 |
 | `package-release.ps1` | 生成不含私密数据的本地发行目录和 ZIP |
@@ -53,7 +54,8 @@ Edge / Chrome
 |---|---|---|
 | `localStorage` | 计划、任务、计时、成绩、复盘、专注设置、个人资料，以及版本化的动态目标与日报 | 学习状态继续使用 `forward-study-v1`；个人资料使用独立的 `study-supervisor-profile-v1` 版本 `1`；日报使用 `forward-daily-report-v1` 版本 `1`；现有“数据”导出暂不包含个人资料、日报与附件 |
 | `IndexedDB` | 统一证据中心附件、导入题图、PDF 栅格页、白板页面与批注历史 | `forward-evidence` 升级为版本 `2`，保留旧 `files` 记录并增加 `reportDate`、`goalId` 索引；发行包不携带实例数据 |
-| `forward-classroom` IndexedDB | 版本 `1` 的课堂起止时间、题目转写、师生文字记录、复盘结果和浏览器支持的 WebM/MP4 录屏 Blob | 独立 `sessions` / `recordings` store；不迁移或改写既有学习、证据和白板数据；删除课堂时事务式删除关联录屏；当前通用导出不覆盖此库 |
+| `forward-classroom` IndexedDB | `sessions` 记录使用数据版本 `2`：在既有起止时间、题目转写、师生文字、复盘上新增教学模式与事件时间轴；`recordings` 保存 WebM/MP4 Blob | 数据库仍为版本 `1`、store 不变；旧 session 没有 `events` 时由完整文字记录生成只读时间轴，不需要破坏性迁移；删除课堂时事务式删除关联录屏 |
+| `forward-learning-library` IndexedDB | 版本 `1` 的 PDF、图片和文字资料 Blob、页数、大小与名称 | 独立于白板和课堂；单文件 40 MB，PDF 最多 10 页；删除资料不级联删除已经生成的白板页或课堂档案 |
 | 服务端内存 | Kimi 会话、一次性能力凭证、请求计数和语音课堂上下文 | Node 进程结束即清除，不作为用户数据备份 |
 | `.env` | Kimi 密钥与本机限额配置 | 仅由本机 Node 进程读取，不进入浏览器存储、日志、导出或发行包 |
 
@@ -99,6 +101,8 @@ Edge / Chrome
 语音识别和提交是两个状态：SpeechRecognition 可连续产生临时/最终片段，但默认只更新可编辑输入框；用户确认后才调用 `/voice/turn`。可选自动提交使用 2.2 秒本地防抖。老师朗读、模型请求和页面后台状态都会停止识别；麦克风屏蔽是默认状态，“打断老师”只取消 SSE/朗读，不会隐式打开麦克风。
 
 课堂录屏使用用户手势触发的 `getDisplayMedia` 和 `MediaRecorder`。用户在浏览器原生面板选择共享目标及是否包含标签页/系统声音；应用不自动附加麦克风轨道。录制按块缓冲，停止后保存为 IndexedDB Blob；配额失败可见，页面结束时停止所有共享轨道。回放使用临时 Blob URL，并在切换或关闭详情时撤销。浏览器不支持、用户拒绝、共享轨道被撤销时，文字课堂仍可继续。
+
+录制中的暂停/继续直接使用 `MediaRecorder.pause()` / `resume()`，不会重新请求权限或创建第二段文件。课堂时间轴仅保存录屏状态事件和课堂页面 ID，不复制大体积图片或视频；白板页被用户删除后，时间轴会保留文字证据并显示页面不可用。
 
 ## 可安装 Web App 边界
 

@@ -12,3 +12,4 @@
 .voice-page-canvas{position:relative;display:inline-block;line-height:0}.voice-page-canvas>img{display:block;max-width:100%;max-height:calc(100vh - 260px);object-fit:contain;background:#fff;box-shadow:0 12px 35px #203b3333}.voice-page-canvas>canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}.voice-page-canvas>canvas.active{pointer-events:auto;cursor:crosshair}.voice-retry{color:#9b4a2e!important;border-color:#e8bcae!important}.voice-retry[hidden]{display:none!important}
 .voice-safety-row{grid-template-columns:auto auto auto 1fr}
 @media(max-width:900px){.voice-question{grid-template-rows:auto auto auto minmax(0,1fr)}.voice-annotate-tools{grid-column:1}.voice-annotate-tools small{width:100%;margin-left:0}.voice-page-canvas>img{max-height:27vh}}
+.voice-safety-row{grid-template-columns:auto auto auto auto auto 1fr!important}

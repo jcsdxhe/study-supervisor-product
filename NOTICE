@@ -6,6 +6,11 @@ platform APIs; the distribution has no required npm runtime dependencies.
 Development/QA tooling such as Playwright is not included in the clean
 distribution archive and is not required to run the application.
 
+Open-source acknowledgements and implementation boundaries are documented in
+THIRD_PARTY_NOTICES.md. OpenMAIC and Open TutorAI informed the classroom and
+personal-material-library design. Screenity and local recording projects
+informed recording controls; their source code is not bundled in this release.
+
 Kimi, Moonshot AI, ChatGPT, OpenAI, Edge and Chrome are trademarks or product
 names of their respective owners. Their services are optional third-party
 services governed by their own terms. This application is not represented as

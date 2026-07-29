@@ -1,5 +1,5 @@
-const CACHE='forward-shell-v4';
-const CORE=['/','/index.html','/styles.css','/whiteboard.css','/classroom-archive.css','/app.js','/daily-report.js','/daily-report.css','/supervision.js','/supervision.css','/whiteboard.js','/kimi.js','/teaching-visuals.js','/classroom-archive.js','/voice-class.js','/pwa.js','/manifest.webmanifest','/app-icon.svg'];
+const CACHE='forward-shell-v5';
+const CORE=['/','/index.html','/styles.css','/whiteboard.css','/learning-library.css','/classroom-archive.css','/app.js','/daily-report.js','/daily-report.css','/supervision.js','/supervision.css','/whiteboard.js','/kimi.js','/teaching-visuals.js','/learning-library.js','/classroom-archive.js','/voice-class.js','/pwa.js','/manifest.webmanifest','/app-icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
