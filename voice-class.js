@@ -121,6 +121,7 @@
   recordOnStart.checked=localStorage.getItem('voice-class-record-on-start')==='true';
   recordOnStart.onchange=()=>localStorage.setItem('voice-class-record-on-start',String(recordOnStart.checked));
   startBtn.onclick=beginClass;
+  startBtn.textContent='用 Kimi 开始真实 AI 课堂';
   layer.querySelector('.voice-mobile-switch').onclick=event=>{const button=event.target.closest('[data-mobile-pane]');if(button)setMobilePane(button.dataset.mobilePane)};
   endBtn.onclick=()=>{if(Date.now()>endArmedUntil){endArmedUntil=Date.now()+3000;endBtn.textContent='再点一次确认结束';setTimeout(()=>{if(Date.now()>endArmedUntil)endBtn.textContent='结束课堂'},3100);return}endBtn.textContent='结束课堂';endClass()};
   shieldBtn.onclick=()=>setShield(!micShielded);
@@ -143,7 +144,13 @@
   sendBtn.onclick=sendTranscript;
   textInput.oninput=()=>clearTimeout(transcriptTimer);
   textInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();sendTranscript()}};
-  window.addEventListener('kimi:proxy-status',event=>{proxyReady=Boolean(event.detail?.configured&&!event.detail?.locked);startBtn.disabled=!proxyReady||active;startBtn.title=proxyReady?'':'请先连接或解锁 Kimi 安全代理'});
+  window.addEventListener('kimi:proxy-status',event=>{proxyReady=Boolean(event.detail?.configured&&!event.detail?.locked);startBtn.disabled=!proxyReady||active;startBtn.title=proxyReady?'':'请先连接或解锁 Kimi 安全代理';window.dispatchEvent(new CustomEvent('voice-class:status',{detail:{ready:proxyReady,active}}))});
+  window.VoiceClassroom={
+    async start(options={}){if(options.context!=null){const context=document.getElementById('kimiContext');if(context)context.value=String(options.context).slice(0,6000)}if(options.record===true)recordOnStart.checked=true;if(active)return true;await beginClass();return active},
+    end:endClass,
+    isReady:()=>proxyReady,
+    isActive:()=>active
+  };
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){cancelVisualAnimation?.();cancelVisualAnimation=null;stopListening(true);stopAudio();setShield(true);setState('课堂已暂停','回到页面后可继续，麦克风已屏蔽')}});
   window.addEventListener('beforeunload',()=>{cancelVisualAnimation?.();stopListening(true);stopAudio();window.ClassroomArchive?.shutdown()});
   setShield(true);
