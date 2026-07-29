@@ -4,6 +4,7 @@
 !package-lock.json
 !index.html
 !styles.css
+!responsive.css
 !app.js
 !daily-report.js
 !daily-report.css

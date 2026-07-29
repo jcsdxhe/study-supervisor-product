@@ -24,13 +24,13 @@ Edge / Chrome
 
 | 文件 | 职责 |
 |---|---|
-| `index.html`, `styles.css`, `app.js` | 页面骨架、计划、任务、计时、成绩、复盘和本地数据 |
+| `index.html`, `styles.css`, `responsive.css`, `app.js` | 页面骨架、跨手机/平板/电脑导航、计划、任务、计时、成绩、复盘和本地数据 |
 | `daily-report.ts`, `daily-report.js`, `daily-report.css` | 动态学习目标、每日汇报、统一证据中心、Markdown 导出与模型无关分析器接口 |
 | `supervision.js`, `supervision.css` | 专注签到、媒体权限、活动信号、提醒与历史 |
 | `whiteboard.js`, `whiteboard.css` | 图片/PDF、多页画布、绘图、IndexedDB、导出 |
 | `kimi.js` | 文字辅导、能力边界、自检、建议批注、语音转写入口 |
 | `voice-class.js` | 全屏语音课堂、连续问答、TTS 队列、随讲事件应用 |
-| `classroom-archive.js`, `classroom-archive.css` | 课堂档案、文字对话、可选 AI 复盘、本地录屏与回放管理 |
+| `classroom-archive.js`, `classroom-archive.css` | 一键课堂方案、完整课堂档案子页面、时间轴、可选 AI 复盘、本地录屏与回放管理 |
 | `learning-library.js`, `learning-library.css` | 个人资料库、PDF 页数/大小边界、资料送入本地批注板 |
 | `review-protocol.js` | 服务端复盘结果的结构、长度、数量和作业答案关联校验 |
 | `server.js` | 静态服务、环境变量、Kimi 代理、限额、SSE 和输出验证 |
@@ -52,7 +52,7 @@ Edge / Chrome
 
 | 存储 | 内容 | 生命周期与恢复 |
 |---|---|---|
-| `localStorage` | 计划、任务、计时、成绩、复盘、专注设置、个人资料，以及版本化的动态目标与日报 | 学习状态继续使用 `forward-study-v1`；个人资料使用独立的 `study-supervisor-profile-v1` 版本 `1`；日报使用 `forward-daily-report-v1` 版本 `1`；现有“数据”导出暂不包含个人资料、日报与附件 |
+| `localStorage` | 计划、任务、计时、成绩、复盘、专注设置、个人资料、导航偏好、一次课堂方案，以及版本化的动态目标与日报 | 学习状态继续使用 `forward-study-v1`；个人资料使用 `study-supervisor-profile-v1`；导航和课堂方案分别使用 `forward-nav-state-v1`、`forward-classroom-blueprint-v1`；这些新增偏好不修改旧结构；现有“数据”导出暂不包含个人资料、日报与附件 |
 | `IndexedDB` | 统一证据中心附件、导入题图、PDF 栅格页、白板页面与批注历史 | `forward-evidence` 升级为版本 `2`，保留旧 `files` 记录并增加 `reportDate`、`goalId` 索引；发行包不携带实例数据 |
 | `forward-classroom` IndexedDB | `sessions` 记录使用数据版本 `2`：在既有起止时间、题目转写、师生文字、复盘上新增教学模式与事件时间轴；`recordings` 保存 WebM/MP4 Blob | 数据库仍为版本 `1`、store 不变；旧 session 没有 `events` 时由完整文字记录生成只读时间轴，不需要破坏性迁移；删除课堂时事务式删除关联录屏 |
 | `forward-learning-library` IndexedDB | 版本 `1` 的 PDF、图片和文字资料 Blob、页数、大小与名称 | 独立于白板和课堂；单文件 40 MB，PDF 最多 10 页；删除资料不级联删除已经生成的白板页或课堂档案 |
@@ -97,6 +97,7 @@ Edge / Chrome
 7. 课堂个人批注沿用现有白板 action，标记为 `classroom-user`；只允许画笔、圆圈和箭头，撤销只删除当前页最近一条个人批注。批注页以一次性请求图片传入，不进入服务端历史，因此下一轮不会隐式重复上传。
 8. `classroom-archive.js` 在课堂开始时建立版本化本地 session，并在用户确认发送、教师回答实际完成时追加文字记录。结束课堂写入结束时间并打开详情；课堂启动失败时丢弃空档案。
 9. `/api/kimi/voice/review` 是显式、无状态的课后请求：只接收当前课堂题目转写、有限长度的文字记录和用户选择项。服务端校验输入总量，用 `review-protocol.js` 清洗总结、作业及答案映射后返回；录屏永不进入该接口。
+10. 一键课堂方案只把用户主动填写的主题、目标、难度、场景与角色作为有限课堂上下文传给后续文字轮次；角色是同一个模型的教学职责，不伪装成多个独立实时模型。上下文最多保留 6000 字符且仅驻留 Node 进程内存。
 
 语音识别和提交是两个状态：SpeechRecognition 可连续产生临时/最终片段，但默认只更新可编辑输入框；用户确认后才调用 `/voice/turn`。可选自动提交使用 2.2 秒本地防抖。老师朗读、模型请求和页面后台状态都会停止识别；麦克风屏蔽是默认状态，“打断老师”只取消 SSE/朗读，不会隐式打开麦克风。
 
@@ -107,6 +108,8 @@ Edge / Chrome
 ## 可安装 Web App 边界
 
 `manifest.webmanifest`、`pwa.js` 与 `sw.js` 提供渐进式安装和基础离线壳。Service Worker 仅处理同源 GET 静态资源，显式绕过 `/api/`、POST 和跨源请求；因此不会持久化 Kimi 会话、题图请求或回答。PWA 不改变 localStorage/IndexedDB 数据模型。
+
+响应式外壳把导航行为分为三档：手机（≤760px）为带遮罩、焦点回收、Esc 关闭和左右滑动手势的抽屉，并提供底部快捷栏；平板（761–1100px）默认为紧凑图标侧栏；电脑为可收起侧栏。课堂在手机上以“讲义/对话”单面板切换，避免两列内容被纵向堆成超长页面。导航偏好只存本机，不进入课堂或 AI 请求。
 
 Node 服务默认仍只监听 `127.0.0.1`。仅当 `ALLOW_CLOUD_PROXY=true` 且 Kimi Key、访问口令、签名密钥和 HTTPS Origin 全部有效时才监听 `0.0.0.0`。云模式的访问口令不进入 Cookie；服务签发 1–72 小时的 HMAC 会话 Cookie，默认 12 小时。学习数据模型没有变化，云端不新增数据库。
 

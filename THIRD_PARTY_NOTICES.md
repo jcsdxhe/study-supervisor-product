@@ -5,10 +5,10 @@
 ## OpenMAIC
 
 - 来源：https://github.com/THU-MAIC/OpenMAIC
-- 核对版本：`v0.3.1` / 2026-07-29 获取的 `main`
-- 许可证：MIT License，Copyright (c) 2026 THU-MAIC
+- 核对版本：`v0.2.1` / 2026-07-29 获取的 `main`
+- 许可证：AGPL-3.0；上游同时提供单独的商业许可咨询渠道。直接复制、修改、部署其源码时必须按实际分发和网络服务方式重新评估义务，不能仅靠署名替代许可证合规。
 - 参考范围：互动课堂的信息架构、教学场景、课件/测验/白板/仿真的组合方式、资料生成课堂与课堂导出思路。
-- 本项目实现：使用本项目原有原生 JavaScript、IndexedDB、Kimi 结构化事件和本地白板重新实现；未复制 OpenMAIC 的 Next.js/React/LangGraph 运行时。
+- 本项目实现：使用本项目原有原生 JavaScript、IndexedDB、Kimi 结构化事件和本地白板独立实现；未复制、打包或运行 OpenMAIC 的 Next.js/React/LangGraph 源码。当前借鉴仅限产品能力与交互结构。
 
 ## Open TutorAI Community Edition
 
