@@ -15,17 +15,20 @@ New-Item -ItemType Directory -Path (Join-Path $dist 'tests') | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $dist 'docs') | Out-Null
 
 $files = @(
-  'index.html','styles.css','app.js','daily-report.ts','daily-report.js','daily-report.css','tsconfig.json','supervision.js','supervision.css',
-  'whiteboard.js','whiteboard.css','kimi.js','voice-class.js','teaching-visuals.js','classroom-archive.js','classroom-archive.css','review-protocol.js','pwa.js','sw.js','manifest.webmanifest','app-icon.svg','server.js','favicon.ico',
+  'index.html','styles.css','responsive.css','homework-tasks.js','app.js','daily-report.ts','daily-report.js','daily-report.css','tsconfig.json','supervision.js','supervision.css',
+  'whiteboard.js','whiteboard.css','kimi.js','voice-class.js','teaching-visuals.js','learning-library.js','learning-library.css','classroom-archive.js','classroom-archive.css','review-protocol.js','pwa.js','sw.js','manifest.webmanifest','app-icon.svg','server.js','favicon.ico',
   'Dockerfile','.dockerignore','render.yaml',
   'package.json','package-lock.json','.env.example','.gitignore','README.md','INSTALL.md',
-  'PRIVACY.md','TERMS_TEMPLATE.md','LICENSE','NOTICE','VERSION','CHANGELOG.md',
-  'package-release.ps1','启动学习督导台.bat'
+  'PRIVACY.md','TERMS_TEMPLATE.md','LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','VERSION','CHANGELOG.md',
+  'package-release.ps1','start-study-supervisor.bat','启动学习督导台.bat'
 )
 foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $source $name) -Destination (Join-Path $dist $name) }
 Copy-Item -LiteralPath (Join-Path $source 'tests\check.js') -Destination (Join-Path $dist 'tests\check.js')
+Copy-Item -LiteralPath (Join-Path $source 'tests\homework-tasks-check.js') -Destination (Join-Path $dist 'tests\homework-tasks-check.js')
+Copy-Item -LiteralPath (Join-Path $source 'docs\OPEN_SOURCE_IMPROVEMENTS.md') -Destination (Join-Path $dist 'docs\OPEN_SOURCE_IMPROVEMENTS.md')
 Copy-Item -LiteralPath (Join-Path $source 'tests\cloud-proxy-check.js') -Destination (Join-Path $dist 'tests\cloud-proxy-check.js')
 Copy-Item -LiteralPath (Join-Path $source 'docs\CLOUD_DEPLOYMENT.md') -Destination (Join-Path $dist 'docs\CLOUD_DEPLOYMENT.md')
+Copy-Item -LiteralPath (Join-Path $source 'docs\PAID_SERVICES.md') -Destination (Join-Path $dist 'docs\PAID_SERVICES.md')
 
 # PDF.js is a local runtime asset. Include the minimal browser build so buyers retain
 # PDF-to-annotation capability without a separate install.

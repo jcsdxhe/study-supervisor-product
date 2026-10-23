@@ -4,6 +4,8 @@
 !package-lock.json
 !index.html
 !styles.css
+!responsive.css
+!homework-tasks.js
 !app.js
 !daily-report.js
 !daily-report.css
@@ -14,6 +16,8 @@
 !kimi.js
 !voice-class.js
 !teaching-visuals.js
+!learning-library.js
+!learning-library.css
 !classroom-archive.js
 !classroom-archive.css
 !review-protocol.js

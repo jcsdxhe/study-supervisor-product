@@ -6,10 +6,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY index.html styles.css app.js ./
+COPY index.html styles.css responsive.css homework-tasks.js app.js ./
 COPY daily-report.js daily-report.css supervision.js supervision.css ./
 COPY whiteboard.js whiteboard.css kimi.js voice-class.js teaching-visuals.js ./
-COPY classroom-archive.js classroom-archive.css review-protocol.js ./
+COPY learning-library.js learning-library.css classroom-archive.js classroom-archive.css review-protocol.js ./
 COPY pwa.js sw.js manifest.webmanifest app-icon.svg favicon.ico server.js ./
 
 USER node
