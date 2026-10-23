@@ -1,1 +1,8 @@
 D8B285454957141892B59A1AB4DAEAB7ED096DA25A763801DD720E652D697EA6  study-supervisor-local-v1.4.0.zip
+
+# Meoo handoff snapshots 2026-09-07; ZIP files are two directories above releases/
+e52e54dbb4bb288e725182b8c98bdef4b7194e145cff723f0cb95a78bc9c309e  ../../study-supervisor-meoo-handoff-v1.7.1-20260907.zip
+0c6f5cd370e962bae532a1d6d875fb2858d1d46ce877ff5664c9c32e215beb3b  ../../study-supervisor-meoo-source-v1.7.1-20260907.zip
+
+# Local maintenance package 2026-10-23; built from an immutable source snapshot
+eb23cd8f55a181695349d3a7bda90ef9b148592385668ea0133b36c6a7b356d3  ../output/maintenance-20261023/study-supervisor-local-v1.7.2.zip

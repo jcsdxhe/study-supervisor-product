@@ -5,8 +5,9 @@
 ## OpenMAIC
 
 - 来源：https://github.com/THU-MAIC/OpenMAIC
-- 核对版本：`v0.2.1` / 2026-07-29 获取的 `main`
-- 许可证：AGPL-3.0；上游同时提供单独的商业许可咨询渠道。直接复制、修改、部署其源码时必须按实际分发和网络服务方式重新评估义务，不能仅靠署名替代许可证合规。
+- 历史参考版本：`v0.2.1`（AGPL-3.0）；此前记录的 2026-07-29 `main` 未固定提交，不作为当前许可证判断依据。
+- 2026-10-23 重新核对：`main` 提交 `ee300e00c7affa672c08dd8307eedc0759daf86a` 的[根许可证为 MIT](https://github.com/THU-MAIC/OpenMAIC/blob/ee300e00c7affa672c08dd8307eedc0759daf86a/LICENSE)；[v0.2.1 仍为 AGPL-3.0](https://github.com/THU-MAIC/OpenMAIC/blob/v0.2.1/LICENSE)。实际引入时按具体版本、文件、依赖及素材分别记录和遵守相应条款，不能把某个版本的结论覆盖其他版本。
+- 若选择旧版源码并希望获得非 AGPL 授权，需要另行核对能否取得商业许可；当前版本的 MIT 条款不能反向改变旧版授权。
 - 参考范围：互动课堂的信息架构、教学场景、课件/测验/白板/仿真的组合方式、资料生成课堂与课堂导出思路。
 - 本项目实现：使用本项目原有原生 JavaScript、IndexedDB、Kimi 结构化事件和本地白板独立实现；未复制、打包或运行 OpenMAIC 的 Next.js/React/LangGraph 源码。当前借鉴仅限产品能力与交互结构。
 
@@ -31,5 +32,7 @@
 - 本项目实现基于浏览器标准 `getDisplayMedia`、`MediaRecorder` 和 IndexedDB，不包含第三方录屏项目源码。
 
 ## 商标与无背书声明
+
+2026-10-23 的候选开源参考、固定提交、许可证及原架构改进建议见 [开源改进调研](docs/OPEN_SOURCE_IMPROVEMENTS.md)。其中 Super Productivity、Excalidraw、Drawnix、DeepTutor 和 ts-fsrs 目前仅作调研参考，尚未作为产品依赖或打包源码。
 
 以上名称属于各自权利人。本项目对相关项目的引用不表示这些作者、组织或项目对“向前 · 学习督导台”的认可、认证或赞助。
